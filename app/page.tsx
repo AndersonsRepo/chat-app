@@ -62,21 +62,39 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
     
     // If we successfully parsed events, render them in a structured format
     if (parsedEvents.length > 0) {
+      // Extract the header with event count if it exists
+      const headerMatch = content.match(/You have (\d+) events? (?:for|next|in) ([^:]+):/i);
+      const eventCount = headerMatch ? headerMatch[1] : parsedEvents.length.toString();
+      
+      // Determine the time period from the content
+      let timePeriod = "upcoming";
+      if (headerMatch) {
+        timePeriod = headerMatch[2];
+      } else if (content.toLowerCase().includes("next week")) {
+        timePeriod = "next week";
+      } else if (content.toLowerCase().includes("next month")) {
+        timePeriod = "next month";
+      } else if (content.toLowerCase().includes("today")) {
+        timePeriod = "today";
+      } else if (content.toLowerCase().includes("tomorrow")) {
+        timePeriod = "tomorrow";
+      }
+      
       // Group events by day
       const eventsByDay: Record<string, ParsedEvent[]> = {};
-      parsedEvents.forEach(event => {
-        const dayDate = `${event.day}, ${event.date}`;
-        if (!eventsByDay[dayDate]) {
-          eventsByDay[dayDate] = [];
+      parsedEvents.forEach((event) => {
+        const dayKey = `${event.day}, ${event.date}`;
+        if (!eventsByDay[dayKey]) {
+          eventsByDay[dayKey] = [];
         }
-        eventsByDay[dayDate].push(event);
+        eventsByDay[dayKey].push(event);
       });
       
       return (
         <div className="space-y-4">
-          {eventsCount && (
+          {eventCount && (
             <div className="font-medium text-indigo-700 mb-2">
-              You have {eventsCount} event{parseInt(eventsCount) !== 1 ? 's' : ''} next week:
+              You have {eventCount} event{parseInt(eventCount) !== 1 ? 's' : ''} {timePeriod}:
             </div>
           )}
           
@@ -125,40 +143,50 @@ export default function CalendarChatApp() {
   const isCalendarQuery = (message: string) => {
     const messageLower = message.toLowerCase();
     
-    // Day of week keywords
-    const dayKeywords = [
+    // Time-related keywords (days, months, time periods)
+    const timeKeywords = [
+      // Days of week
       "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-      "mon", "tue", "wed", "thu", "fri", "sat", "sun"
+      "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+      
+      // Months
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december",
+      "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+      
+      // Time periods
+      "today", "tomorrow", "yesterday",
+      "week", "month", "year",
+      "morning", "afternoon", "evening", "night"
     ];
     
     // Calendar-related keywords
     const calendarKeywords = [
-      "schedule",
-      "scheduled",
+      "schedule", "scheduled", "scheduling",
       "calendar",
-      "appointment",
-      "meeting",
-      "event",
-      "today",
-      "tomorrow",
-      "this week",
-      "next week",
-      "when do i have",
-      "what do i have",
-      "what about", // Catches phrases like "what about wednesday"
-      "free time",
-      "busy",
-      "available",
+      "appointment", "appointments",
+      "meeting", "meetings",
+      "event", "events",
+      "call", "calls",
+      "plan", "plans", "planned",
+      "when", "what", "where", "who", "how", // Question words often used with calendar
+      "free", "busy", "available", "availability",
+      "remind", "reminder", "reminders",
+      "upcoming",
+      "time", "date"
     ];
     
     // Check if message contains any calendar keyword
-    const hasCalendarKeyword = calendarKeywords.some(keyword => messageLower.includes(keyword.toLowerCase()));
+    const hasCalendarKeyword = calendarKeywords.some(keyword => messageLower.includes(keyword));
     
-    // Check if message contains any day of week
-    const hasDayMention = dayKeywords.some(day => messageLower.includes(day.toLowerCase()));
+    // Check if message contains any time-related keyword
+    const hasTimeKeyword = timeKeywords.some(time => messageLower.includes(time));
     
-    // Return true if message has either a calendar keyword or mentions a day
-    return hasCalendarKeyword || hasDayMention;
+    // If the message is very short (likely a follow-up question), send it to n8n
+    const isShortFollowUp = message.split(" ").length <= 4;
+    
+    // Return true if message has calendar keywords, time keywords, or is a short follow-up
+    return hasCalendarKeyword || hasTimeKeyword || isShortFollowUp;
   }
 
   // Update the handleCalendarQuery function to handle both array and object responses
