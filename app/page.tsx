@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRef, useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useChat } from "ai/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,14 +33,14 @@ interface ParsedEvent {
 
 // Function to format calendar response into a more readable format
 function formatCalendarResponse(content: string, isClient: boolean): React.ReactNode {
-  // Return simple content during server-side rendering to prevent hydration mismatch
-  if (!isClient) {
-    return <span>{content}</span>;
+  // Always return simple content during server-side rendering to avoid hydration issues
+  if (typeof window === 'undefined' || !isClient) {
+    return <span key="server-content">{content}</span>;
   }
   // Check if this is a calendar events list
   if (content.includes('events:') || content.includes('event:')) {
     // Extract the events count if available
-    const eventsCountMatch = content.match(/You have (\d+) events?:/i);
+    const eventsCountMatch = content.match(/You have (\d+) events?(?:(?:\s+(?:for|next|in)\s+)([^:]+))?:/i);
     const eventsCount = eventsCountMatch ? eventsCountMatch[1] : null;
     
     // Parse the events from the text
@@ -63,21 +63,61 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
     // If we successfully parsed events, render them in a structured format
     if (parsedEvents.length > 0) {
       // Extract the header with event count if it exists
-      const headerMatch = content.match(/You have (\d+) events? (?:for|next|in) ([^:]+):/i);
+      // This regex handles both formats:
+      // "You have X events for/next/in [time period]:" and "You have X events:"
+      const headerMatch = content.match(/You have (\d+) events?(?:(?: (?:for|next|in) )([^:]+))?:/i);
       const eventCount = headerMatch ? headerMatch[1] : parsedEvents.length.toString();
       
       // Determine the time period from the content
       let timePeriod = "upcoming";
-      if (headerMatch) {
+      const contentLower = content.toLowerCase();
+      
+      // Check for explicit header match first
+      if (headerMatch && headerMatch[2]) {
         timePeriod = headerMatch[2];
-      } else if (content.toLowerCase().includes("next week")) {
-        timePeriod = "next week";
-      } else if (content.toLowerCase().includes("next month")) {
-        timePeriod = "next month";
-      } else if (content.toLowerCase().includes("today")) {
-        timePeriod = "today";
-      } else if (content.toLowerCase().includes("tomorrow")) {
-        timePeriod = "tomorrow";
+      } 
+      // Check for time periods in the content
+      else {
+        // First check for week-related keywords (higher priority)
+        if (contentLower.includes("next week")) {
+          timePeriod = "next week";
+        } else if (contentLower.includes("this week")) {
+          timePeriod = "this week";
+        } else if (contentLower.includes("week")) {
+          timePeriod = "this week";
+        } else if (contentLower.includes("today")) {
+          timePeriod = "today";
+        } else if (contentLower.includes("tomorrow")) {
+          timePeriod = "tomorrow";
+        } else if (contentLower.includes("next month")) {
+          timePeriod = "next month";
+        } else if (contentLower.includes("this month")) {
+          timePeriod = "this month";
+        } else {
+          // If no time period keywords found, check for month names
+          const monthMap: Record<string, string> = {
+            "january": "January", "jan": "January",
+            "february": "February", "feb": "February",
+            "march": "March", "mar": "March",
+            "april": "April", "apr": "April",
+            "may": "May",
+            "june": "June", "jun": "June",
+            "july": "July", "jul": "July",
+            "august": "August", "aug": "August",
+            "september": "September", "sep": "September", "sept": "September",
+            "october": "October", "oct": "October",
+            "november": "November", "nov": "November",
+            "december": "December", "dec": "December"
+          };
+          
+          // Find the first month mentioned in the content
+          for (const [abbrev, fullName] of Object.entries(monthMap)) {
+            if (contentLower.includes(abbrev)) {
+              timePeriod = fullName;
+              break;
+            }
+          }
+        }
       }
       
       // Group events by day
@@ -89,6 +129,42 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
         }
         eventsByDay[dayKey].push(event);
       });
+      
+      // Extract month name from the first event date if present
+      let monthName = "";
+      if (parsedEvents.length > 0) {
+        const firstEventDate = parsedEvents[0].date; // e.g., "Dec 1"
+        const monthMatch = firstEventDate.match(/([A-Za-z]+)\s+\d+/);
+        if (monthMatch) {
+          // Get the abbreviated month name
+          const abbrevMonth = monthMatch[1]; // e.g., "Dec"
+          
+          // Convert abbreviated month to full month name
+          const monthMap: Record<string, string> = {
+            "Jan": "January",
+            "Feb": "February",
+            "Mar": "March",
+            "Apr": "April",
+            "May": "May",
+            "Jun": "June",
+            "Jul": "July",
+            "Aug": "August",
+            "Sep": "September",
+            "Sept": "September",
+            "Oct": "October",
+            "Nov": "November",
+            "Dec": "December"
+          };
+          
+          // Use the full month name if available, otherwise use the abbreviation
+          monthName = monthMap[abbrevMonth] || abbrevMonth;
+        }
+      }
+      
+      // Use the extracted month name if timePeriod is still "upcoming"
+      if (timePeriod === "upcoming" && monthName) {
+        timePeriod = `in ${monthName}`;
+      }
       
       return (
         <div className="space-y-4">
@@ -120,16 +196,21 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
   }
   
   // If we couldn't parse the events or it's not a calendar response, return the original content
-  return <span>{content}</span>;
+  return <span key="client">{content}</span>;
 }
 
 export default function CalendarChatApp() {
-  // Add a client-side only state to prevent hydration errors
-  const [isClient, setIsClient] = React.useState(false);
-  
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
+  // Use a ref instead of state to avoid re-renders
+  const isClientRef = useRef(false)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    isClientRef.current = true
+    setIsClient(true)
+  }, [])
+
+  // Create a stable key for components that need to be re-rendered on client
+  const clientKey = isClient ? 'client' : 'server';
   const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat()
   const [isCalendarLoading, setIsCalendarLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -139,78 +220,63 @@ export default function CalendarChatApp() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Check if the message is calendar-related
+  // Function to determine if a message is a calendar-related query
+  // Ultra-simplified based on Claude Sonnet's recommendations
   const isCalendarQuery = (message: string) => {
-    const messageLower = message.toLowerCase();
+    console.log("Checking if message is calendar query:", message);
     
-    // Time-related keywords (days, months, time periods)
-    const timeKeywords = [
-      // Days of week
-      "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-      "mon", "tue", "wed", "thu", "fri", "sat", "sun",
-      
-      // Months
-      "january", "february", "march", "april", "may", "june",
-      "july", "august", "september", "october", "november", "december",
-      "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
-      
-      // Time periods
-      "today", "tomorrow", "yesterday",
-      "week", "month", "year",
-      "morning", "afternoon", "evening", "night"
+    // Basic safety checks
+    if (!message.trim()) {
+      console.log("Empty message, not a calendar query");
+      return false;
+    }
+    
+    if (message.length > 5000) {
+      console.log("Message too long, not a calendar query");
+      return false;
+    }
+    
+    // Check for extremely obvious injection attempts
+    const suspiciousPatterns = [
+      /<script>/i,
+      /javascript:/i,
+      /data:text\/html/i
     ];
+    if (suspiciousPatterns.some(pattern => pattern.test(message))) {
+      console.log("Suspicious pattern detected, not a calendar query");
+      return false;
+    }
     
-    // Calendar-related keywords
-    const calendarKeywords = [
-      "schedule", "scheduled", "scheduling",
-      "calendar",
-      "appointment", "appointments",
-      "meeting", "meetings",
-      "event", "events",
-      "call", "calls",
-      "plan", "plans", "planned",
-      "when", "what", "where", "who", "how", // Question words often used with calendar
-      "free", "busy", "available", "availability",
-      "remind", "reminder", "reminders",
-      "upcoming",
-      "time", "date"
-    ];
-    
-    // Check if message contains any calendar keyword
-    const hasCalendarKeyword = calendarKeywords.some(keyword => messageLower.includes(keyword));
-    
-    // Check if message contains any time-related keyword
-    const hasTimeKeyword = timeKeywords.some(time => messageLower.includes(time));
-    
-    // If the message is very short (likely a follow-up question), send it to n8n
-    const isShortFollowUp = message.split(" ").length <= 4;
-    
-    // Return true if message has calendar keywords, time keywords, or is a short follow-up
-    return hasCalendarKeyword || hasTimeKeyword || isShortFollowUp;
-  }
+    // Let ALL messages through to the n8n workflow
+    // Claude Sonnet recommended removing over-filtering
+    console.log("Passing message to n8n workflow:", message);
+    return true;
+  };
 
-  // Update the handleCalendarQuery function to handle both array and object responses
+  // Update the handleCalendarQuery function to handle the updated n8n workflow structure
   const handleCalendarQuery = async (query: string) => {
     setIsCalendarLoading(true)
 
     try {
       const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL as string
 
-      // Debug logging
+      // Enhanced debug logging
       console.log("Webhook URL:", webhookUrl)
+      console.log("Environment variables available:", {
+        NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL,
+      })
 
       if (!webhookUrl) {
         throw new Error("NEXT_PUBLIC_WEBHOOK_URL environment variable is not set")
       }
 
+      // Updated request body to match the new n8n workflow structure
       const requestBody = {
-        sessionId: "bded18e27b064f659085802d9da651f8",
-        action: "sendMessage",
         chatInput: query,
       }
 
       console.log("Making request to:", webhookUrl)
-      console.log("Request body:", requestBody)
+      console.log("Request body:", JSON.stringify(requestBody))
 
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -230,22 +296,31 @@ export default function CalendarChatApp() {
       console.log("Response data:", rawData)
 
       // Handle both array and object response formats
-      let calendarData: CalendarEvent
+      let calendarData: any
 
       if (Array.isArray(rawData)) {
         // If it's an array, take the first item
-        calendarData = rawData[0]
+        calendarData = rawData[0]?.json || rawData[0]
       } else {
-        // If it's already an object with response and success
+        // If it's already an object
         calendarData = rawData
       }
 
-      if (calendarData && calendarData.success) {
+      console.log("Processed calendar data:", calendarData)
+
+      // Check for message or spokenResponse fields in the new n8n workflow format
+      if (calendarData) {
+        // Use the most appropriate response field available
+        const responseContent = calendarData.spokenResponse || 
+                              calendarData.message || 
+                              calendarData.response || 
+                              "I found your calendar information."
+
         // Add calendar response as an assistant message
         const calendarMessage = {
           id: Date.now().toString(),
           role: "assistant" as const,
-          content: calendarData.response,
+          content: responseContent,
           createdAt: new Date(),
         }
 
@@ -345,66 +420,43 @@ export default function CalendarChatApp() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className="flex flex-col space-y-4">
+              {messages.map((message) => {
+                const isCalendarResponse = message.role === "assistant" && 
+                  (message.content.includes("events:") || message.content.includes("event:"));
+                
+                return (
                   <div
-                    className={`
-                    flex items-start gap-2 max-w-[80%] 
-                    ${message.role === "user" ? "flex-row-reverse" : ""}
-                  `}
+                    key={`${message.id}-${clientKey}`}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`
-                      p-1 rounded-full 
-                      ${message.role === "user" ? "bg-blue-500" : "bg-indigo-500"}
-                    `}
+                      className={`relative p-3 rounded-lg ${message.role === "user" ? "bg-blue-100" : "bg-gray-100"}`}
                     >
-                      {message.role === "user" ? (
-                        <User size={18} className="text-white" />
-                      ) : isCalendarQuery(message.content) ? (
-                        <Calendar size={18} className="text-white" />
-                      ) : (
-                        <Bot size={18} className="text-white" />
-                      )}
-                    </div>
-                    <div
-                      className={`
-                      p-3 rounded-2xl shadow-sm
-                      ${
-                        message.role === "user"
-                          ? "bg-blue-500 text-white rounded-tr-none"
-                          : message.content.includes("event") || message.content.includes("scheduled")
-                            ? "bg-indigo-100 text-indigo-800 rounded-tl-none border border-indigo-200"
-                            : "bg-gray-100 text-gray-800 rounded-tl-none"
-                      }
-                    `}
-                    >
-                      {message.content.includes("event") && message.role === "assistant" ? (
-                        <div className="flex items-start gap-2">
-                          <Clock size={16} className="mt-1 flex-shrink-0" />
-                          <div>{formatCalendarResponse(message.content, isClient)}</div>
+                      <div className="flex items-start">
+                        <div className="mr-2">
+                          {message.role === "user" ? <User className="h-5 w-5" /> : 
+                            isCalendarResponse ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
                         </div>
-                      ) : (
-                        message.content
-                      )}
+                        <div>
+                          {message.role === "assistant" && isCalendarResponse
+                            ? formatCalendarResponse(message.content, isClient)
+                            : <span key={`content-${clientKey}`}>{message.content}</span>}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-
+                );
+              })}
+              
               {(isLoading || isCalendarLoading) && (
                 <div className="flex justify-start">
-                  <div className="flex items-start gap-2 max-w-[80%]">
-                    <div className="p-1 rounded-full bg-indigo-500">
-                      {isCalendarLoading ? (
-                        <Calendar size={18} className="text-white" />
-                      ) : (
-                        <Bot size={18} className="text-white" />
-                      )}
+                  <div className="flex items-start">
+                    <div className="mr-2">
+                      {isCalendarLoading ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
                     </div>
-                    <div className="p-3 rounded-2xl shadow-sm bg-gray-100 text-gray-800 rounded-tl-none">
-                      <div className="flex items-center gap-2">
+                    <div className="bg-gray-100 p-3 rounded-lg">
+                      <div className="flex items-center">
                         <div className="animate-pulse">●</div>
                         <div className="animate-pulse delay-100">●</div>
                         <div className="animate-pulse delay-200">●</div>
@@ -414,7 +466,7 @@ export default function CalendarChatApp() {
                   </div>
                 </div>
               )}
-
+              
               <div ref={messagesEndRef} />
             </div>
           )}
