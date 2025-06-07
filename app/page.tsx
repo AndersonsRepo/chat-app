@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useRef, useState } from "react"
-import { useChat } from "ai/react"
+import { useChat, Message } from "ai/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,7 +29,10 @@ interface ParsedEvent {
   fullText: string
 }
 
-// Using the Message type from the AI SDK instead of creating our own
+// Using the Message type from the AI SDK but extending it with our custom fields
+interface ExtendedMessage extends Message {
+  webResponse?: string;
+}
 
 // Function to format calendar response into a more readable format
 function formatCalendarResponse(content: string, isClient: boolean): React.ReactNode {
@@ -37,7 +40,109 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
   if (typeof window === 'undefined' || !isClient) {
     return <span key="server-content">{content}</span>;
   }
-  // Check if this is a calendar events list
+  
+  // Check if this is markdown from webResponse (starts with ** or contains line breaks)
+  if (content.startsWith('**') || content.includes('\n')) {
+    console.log("Detected markdown formatting in webResponse");
+    
+    // Split the content by line breaks
+    const lines = content.split('\n');
+    
+    // Group lines by day headers
+    const dayGroups: {[key: string]: string[]} = {};
+    let currentDay = "";
+    let hasTitle = false;
+    
+    // First line is usually the title
+    if (lines.length > 0 && lines[0].startsWith('**')) {
+      hasTitle = true;
+    }
+    
+    // Process the lines
+    lines.forEach((line, index) => {
+      // Skip empty lines and the title (which we handle separately)
+      if (!line.trim() || (index === 0 && hasTitle)) return;
+      
+      // Check if this is a day header (starts with ** and doesn't contain a bullet point)
+      if (line.startsWith('**') && !line.includes('•') && !line.includes('events')) {
+        currentDay = line.replace(/\*\*/g, '').trim();
+        dayGroups[currentDay] = [];
+      } else if (currentDay) {
+        // Add this line to the current day group
+        dayGroups[currentDay] = [...(dayGroups[currentDay] || []), line];
+      } else {
+        // If no day header yet, create a default group
+        if (!dayGroups["Your Schedule"]) {
+          dayGroups["Your Schedule"] = [];
+        }
+        dayGroups["Your Schedule"].push(line);
+      }
+    });
+    
+    // Get the title from the first line if it exists
+    const title = hasTitle ? lines[0].replace(/\*\*/g, '').trim() : "Your Schedule";
+    
+    return (
+      <div className="space-y-4" key="calendar-response-markdown">
+        <div className="font-medium text-indigo-700 mb-2">
+          <div className="flex items-center">
+            <Calendar className="mr-2" size={18} />
+            {title}
+          </div>
+        </div>
+        
+        {Object.entries(dayGroups).map(([day, dayLines], dayIndex) => (
+          <div key={dayIndex} className="mb-3">
+            <div className="font-medium text-indigo-800 border-b border-indigo-200 pb-1 mb-2">
+              {day}
+            </div>
+            <div className="space-y-2 pl-2">
+              {dayLines.map((line, lineIndex) => {
+                // Format bullet points
+                if (line.includes('•')) {
+                  // Handle different bullet point formats
+                  let timePart = "";
+                  let titlePart = "";
+                  
+                  if (line.includes(':')) {
+                    // Format: "• 9:00 AM: Meeting with team"
+                    const parts = line.replace('•', '').trim().split(':');
+                    timePart = parts[0] + ':' + parts[1]; // Combine hour:minute
+                    titlePart = parts.slice(2).join(':'); // Everything after time
+                  } else {
+                    // Format: "• 9:00 AM - 10:00 AM (1 hour)"
+                    timePart = line.replace('•', '').trim();
+                  }
+                  
+                  return (
+                    <div key={`event-${dayIndex}-${lineIndex}`} className="flex items-center gap-2 py-1 hover:bg-indigo-50 rounded px-1">
+                      <Clock size={14} className="text-indigo-500" />
+                      <span className="font-medium text-indigo-900">{timePart}</span>
+                      {titlePart && <span className="text-gray-700">{titlePart.trim()}</span>}
+                    </div>
+                  );
+                }
+                
+                // Format notes (italics)
+                if (line.startsWith('*') && line.endsWith('*')) {
+                  return (
+                    <div key={`note-${dayIndex}-${lineIndex}`} className="text-gray-500 italic text-sm mt-2">
+                      {line.replace(/\*/g, '')}
+                    </div>
+                  );
+                }
+                
+                // Regular text
+                return <div key={`line-${dayIndex}-${lineIndex}`}>{line}</div>;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  // Original calendar events list parsing
   if (content.includes('events:') || content.includes('event:')) {
     // Extract the events count if available
     const eventsCountMatch = content.match(/You have (\d+) events?(?:(?:\s+(?:for|next|in)\s+)([^:]+))?:/i);
@@ -203,24 +308,34 @@ export default function CalendarChatApp() {
   // Use a ref instead of state to avoid re-renders
   const isClientRef = useRef(false)
   const [isClient, setIsClient] = useState(false)
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false)
+  const [messages, setMessages] = useState<ExtendedMessage[]>([])
+  const [clientKey, setClientKey] = useState("")
+
+  // Create a reference for auto-scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Get chat functionality from AI SDK
+  const { input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: "/api/chat",
+    onResponse: (response) => {
+      // This is handled by the messages state we manage
+    },
+    onFinish: (message) => {
+      // We handle message display ourselves
+    },
+  })
 
   useEffect(() => {
     isClientRef.current = true
     setIsClient(true)
+    setClientKey(isClient ? 'client' : 'server')
   }, [])
-
-  // Create a stable key for components that need to be re-rendered on client
-  const clientKey = isClient ? 'client' : 'server';
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat()
-  const [isCalendarLoading, setIsCalendarLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
-
-  // Function to determine if a message is a calendar-related query
   // Ultra-simplified based on Claude Sonnet's recommendations
   const isCalendarQuery = (message: string) => {
     console.log("Checking if message is calendar query:", message);
@@ -256,27 +371,13 @@ export default function CalendarChatApp() {
   // Update the handleCalendarQuery function to handle the updated n8n workflow structure
   const handleCalendarQuery = async (query: string) => {
     setIsCalendarLoading(true)
-
     try {
       const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL as string
-
-      // Enhanced debug logging
       console.log("Webhook URL:", webhookUrl)
-      console.log("Environment variables available:", {
-        NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL,
-      })
-
-      if (!webhookUrl) {
-        throw new Error("NEXT_PUBLIC_WEBHOOK_URL environment variable is not set")
-      }
-
-      // Updated request body to match the new n8n workflow structure
-      const requestBody = {
-        chatInput: query,
-      }
-
-      console.log("Making request to:", webhookUrl)
-      console.log("Request body:", JSON.stringify(requestBody))
+      console.log("Environment variables available:", { NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL })
+      if (!webhookUrl) throw new Error("NEXT_PUBLIC_WEBHOOK_URL environment variable is not set")
+      const requestBody = { chatInput: query }
+      console.log("Sending calendar query to webhook:", requestBody)
 
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -286,18 +387,14 @@ export default function CalendarChatApp() {
         body: JSON.stringify(requestBody),
       })
 
-      console.log("Response status:", response.status)
-
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Calendar API returned ${response.status}: ${response.statusText}`)
       }
 
       const rawData = await response.json()
-      console.log("Response data:", rawData)
+      console.log("Raw calendar response:", JSON.stringify(rawData, null, 2))
 
-      // Handle both array and object response formats
-      let calendarData: any
-
+      let calendarData
       if (Array.isArray(rawData)) {
         // If it's an array, take the first item
         calendarData = rawData[0]?.json || rawData[0]
@@ -305,22 +402,41 @@ export default function CalendarChatApp() {
         // If it's already an object
         calendarData = rawData
       }
+      
+      // Log specific fields we're looking for
+      console.log("Calendar response fields:", {
+        hasWebResponse: !!calendarData?.webResponse,
+        webResponseType: typeof calendarData?.webResponse,
+        webResponseLength: calendarData?.webResponse?.length,
+        hasSpokenResponse: !!calendarData?.spokenResponse,
+        hasMessage: !!calendarData?.message,
+        hasResponse: !!calendarData?.response,
+      })
 
       console.log("Processed calendar data:", calendarData)
 
       // Check for message or spokenResponse fields in the new n8n workflow format
       if (calendarData) {
-        // Use the most appropriate response field available
+        // First check for webResponse (formatted calendar display)
+        const hasWebResponse = calendarData.webResponse && typeof calendarData.webResponse === 'string';
+        
+        // Use the most appropriate response field available for spoken/text content
         const responseContent = calendarData.spokenResponse || 
                               calendarData.message || 
                               calendarData.response || 
-                              "I found your calendar information."
+                              "I found your calendar information.";
+        
+        // Store both the spoken response and web response separately
+        console.log("Using webResponse for display:", hasWebResponse);
+        console.log("Display content:", calendarData.webResponse);
+        console.log("Spoken content:", responseContent);
 
-        // Add calendar response as an assistant message
+        // Add calendar response as an assistant message with both content types
         const calendarMessage = {
           id: Date.now().toString(),
           role: "assistant" as const,
           content: responseContent,
+          webResponse: hasWebResponse ? calendarData.webResponse : undefined,
           createdAt: new Date(),
         }
 
@@ -421,9 +537,11 @@ export default function CalendarChatApp() {
             </div>
           ) : (
             <div className="flex flex-col space-y-4">
-              {messages.map((message) => {
+              {messages.map((message: any) => {
+                // Check if this is a calendar response (either by content or by having webResponse)
+                const hasWebResponse = message.webResponse && typeof message.webResponse === 'string';
                 const isCalendarResponse = message.role === "assistant" && 
-                  (message.content.includes("events:") || message.content.includes("event:"));
+                  (hasWebResponse || message.content.includes("events:") || message.content.includes("event:"));
                 
                 return (
                   <div
@@ -440,7 +558,7 @@ export default function CalendarChatApp() {
                         </div>
                         <div>
                           {message.role === "assistant" && isCalendarResponse
-                            ? formatCalendarResponse(message.content, isClient)
+                            ? formatCalendarResponse(hasWebResponse ? message.webResponse : message.content, isClient)
                             : <span key={`content-${clientKey}`}>{message.content}</span>}
                         </div>
                       </div>
