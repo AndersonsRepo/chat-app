@@ -34,6 +34,130 @@ interface ExtendedMessage extends Message {
   webResponse?: string;
 }
 
+// Function to convert URLs in text to clickable links
+function convertUrlsToLinks(text: string): React.ReactNode {
+  if (!text) return text;
+  
+  // Check for the pattern: "You can view it [here](URL)"
+  const herePattern = /You can view it \[here\]\((https?:\/\/[^\)]+)\)/gi;
+  let modifiedText = text;
+  let matches = [];
+  let match;
+  
+  // First handle the "You can view it [here]" pattern
+  while ((match = herePattern.exec(text)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      url: match[1],
+      index: match.index
+    });
+  }
+  
+  // If we found "here" links, process them
+  if (matches.length > 0) {
+    const result: React.ReactNode[] = [];
+    let lastIndex = 0;
+    
+    matches.forEach((match, i) => {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        result.push(
+          <span key={`text-${i}`}>
+            {text.substring(lastIndex, match.index)}
+          </span>
+        );
+      }
+      
+      // Replace with "You can view it here" where "here" is a link
+      const beforeLink = "You can view it ";
+      result.push(
+        <span key={`before-link-${i}`}>{beforeLink}</span>
+      );
+      
+      result.push(
+        <a
+          key={`link-${i}`}
+          href={match.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline"
+        >
+          here
+        </a>
+      );
+      
+      lastIndex = match.index + match.fullMatch.length;
+    });
+    
+    // Add any remaining text after the last match
+    if (lastIndex < text.length) {
+      result.push(
+        <span key={`text-${matches.length}`}>
+          {text.substring(lastIndex)}
+        </span>
+      );
+    }
+    
+    return <>{result}</>;
+  }
+  
+  // Regular expression to match URLs (fallback for other URLs in the text)
+  const urlRegex = /(https?:\/\/[^\s\)\]]+)/g;
+  
+  // Reset for the general URL handling
+  matches = [];
+  while ((match = urlRegex.exec(text)) !== null) {
+    matches.push({
+      url: match[0],
+      index: match.index
+    });
+  }
+  
+  // If no URLs found, return the original text
+  if (matches.length === 0) return text;
+  
+  // Build the result with text segments and links
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  
+  matches.forEach((match, i) => {
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      result.push(
+        <span key={`text-${i}`}>
+          {text.substring(lastIndex, match.index)}
+        </span>
+      );
+    }
+    
+    // Add the URL as a link
+    result.push(
+      <a
+        key={`link-${i}`}
+        href={match.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 hover:underline"
+      >
+        here
+      </a>
+    );
+    
+    lastIndex = match.index + match.url.length;
+  });
+  
+  // Add any remaining text after the last URL
+  if (lastIndex < text.length) {
+    result.push(
+      <span key={`text-${matches.length}`}>
+        {text.substring(lastIndex)}
+      </span>
+    );
+  }
+  
+  return <>{result}</>;
+}
+
 // Function to format calendar response into a more readable format
 function formatCalendarResponse(content: string, isClient: boolean): React.ReactNode {
   // Always return simple content during server-side rendering to avoid hydration issues
@@ -132,8 +256,8 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
                   );
                 }
                 
-                // Regular text
-                return <div key={`line-${dayIndex}-${lineIndex}`}>{line}</div>;
+                // Regular text - convert any URLs to clickable links
+                return <div key={`line-${dayIndex}-${lineIndex}`}>{convertUrlsToLinks(line)}</div>;
               })}
             </div>
           </div>
@@ -300,8 +424,8 @@ function formatCalendarResponse(content: string, isClient: boolean): React.React
     }
   }
   
-  // If we couldn't parse the events or it's not a calendar response, return the original content
-  return <span key="client">{content}</span>;
+  // If we couldn't parse the events or it's not a calendar response, return the original content with clickable links
+  return <span key="client">{convertUrlsToLinks(content)}</span>;
 }
 
 export default function CalendarChatApp() {
