@@ -2,68 +2,256 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors - soft neutral background */
+    --mist-gray: 220 20% 97%;
+    --whisper-white: 0 0% 99%;
+    --background: var(--mist-gray);
+    --foreground: 220 25% 20%;
 
+    /* Primary - calm navy */
+    --calm-navy: 215 45% 30%;
+    --warm-graphite: 220 15% 25%;
+    --primary: var(--calm-navy);
+    --primary-foreground: 0 0% 100%;
+
+    /* Accent colors */
+    --energetic-coral: 5 95% 65%;
+    --electric-mint: 170 70% 55%;
+    --subtle-violet: 260 60% 65%;
+    --subtle-teal: 185 60% 55%;
+    
+    /* UI colors */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 220 25% 20%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-
+    --popover-foreground: 220 25% 20%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
+    --accent: var(--energetic-coral);
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-
-    --radius: 0.5rem;
+    --ring: var(--calm-navy);
+    --radius: 1rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Base colors - deep background */
+    --background: 220 30% 10%;
+    --foreground: 220 15% 90%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Primary colors - lighter navy */
+    --primary: 220 40% 70%;
+    --primary-foreground: 220 25% 15%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
+    /* Card colors */
+    --card: 220 25% 15%;
+    --card-foreground: 220 15% 90%;
+    --popover: 220 25% 15%;
+    --popover-foreground: 220 15% 90%;
+    --secondary: 220 25% 20%;
+    --secondary-foreground: 220 15% 90%;
+    --muted: 220 25% 20%;
+    --muted-foreground: 220 15% 65%;
+    --accent: 5 85% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 221.2 83.2% 53.3%;
+    --border: 220 25% 25%;
+    --input: 220 25% 25%;
+    --ring: 220 40% 70%;
   }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  /* Chat bubble styles */
+  .chat-bubble-user {
+    background: linear-gradient(135deg, hsl(var(--calm-navy)) 0%, hsl(var(--calm-navy)/0.85) 100%);
+    color: white;
+    border-radius: 18px 18px 0 18px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform-origin: bottom right;
+    animation: pop-in 0.3s ease-out forwards;
+  }
+  
+  .chat-bubble-assistant {
+    background: white;
+    border-radius: 18px 18px 18px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transform-origin: bottom left;
+    animation: pop-in 0.3s ease-out forwards;
+  }
+  
+  .chat-bubble-calendar {
+    background: linear-gradient(135deg, hsl(var(--electric-mint)/0.15) 0%, hsl(var(--subtle-teal)/0.15) 100%);
+    border-radius: 18px 18px 18px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transform-origin: bottom left;
+    animation: pop-in 0.3s ease-out forwards;
+  }
+  
+  /* Animation classes */
+  .animate-pulse-dot {
+    animation: pulse-dot 1.5s infinite;
+    animation-delay: calc(var(--delay, 0) * 0.3s);
+  }
+  
+  /* Button styles */
+  .button-primary {
+    background-image: linear-gradient(to right, hsl(var(--calm-navy)), hsl(var(--warm-graphite)));
+    color: white;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  .button-primary:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+  }
+  
+  .button-accent {
+    background-image: linear-gradient(to right, hsl(var(--energetic-coral)), hsl(var(--energetic-coral)/0.85));
+    color: white;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  .button-accent:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+  }
+  
+  /* Input styles */
+  .input-modern {
+    border-radius: 0.75rem;
+    border: 2px solid transparent;
+    background-color: white;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  .input-modern:focus {
+    border-color: hsl(var(--calm-navy)/0.5);
+    box-shadow: 0 0 0 2px hsl(var(--calm-navy)/0.2);
+    outline: none;
+  }
+  
+  /* Card styles */
+  .card-hover {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  .card-hover:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+  }
+}
+
+/* Animations */
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes spin-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes micro-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 3s ease-in-out forwards;
+}
+
+.animate-pulse-dot {
+  animation: pulse 1.5s infinite;
+}
+
+.animate-pulse-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.animate-pulse-dot:nth-child(3) {
+  animation-delay: 0.4s;
 }
 
 @layer base {

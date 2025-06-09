@@ -3,10 +3,10 @@
 import * as React from "react"
 import { useEffect, useRef, useState } from "react"
 import { useChat, Message } from "ai/react"
+import { Bot, Calendar, CheckCircle2, Clock, MessageSquare, Send, Sun, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Send, Bot, User, Calendar, Clock, CheckCircle2 } from "lucide-react"
 
 // Debug: Check if environment variable is available
 console.log("Environment check:", {
@@ -617,17 +617,32 @@ export default function CalendarChatApp() {
   // Use a simple loading state during server-side rendering
   if (!isClient) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-        <Card className="w-full max-w-2xl shadow-lg border-0">
-          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-lg">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar size={24} />
-              Calendar Chat Assistant
-            </CardTitle>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-mist-gray to-whisper-white p-4">
+        <Card className="w-full max-w-2xl shadow-xl border-0 rounded-2xl overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-[hsl(var(--calm-navy))] to-[hsl(var(--warm-graphite))] text-white rounded-t-xl">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 font-heading">
+                <Bot className="h-6 w-6" />
+                <span>Clarity</span>
+              </CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="text-xs opacity-80">
+                  {new Date().toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'})}
+                </div>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="h-[60vh] p-4 bg-white">
+          <CardContent className="h-[60vh] p-6 bg-white">
             <div className="h-full flex items-center justify-center">
-              <p>Loading...</p>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative w-16 h-16">
+                  <div className="absolute inset-0 bg-[hsl(var(--calm-navy)/0.2)] rounded-full animate-ping"></div>
+                  <div className="relative flex items-center justify-center w-16 h-16 bg-[hsl(var(--calm-navy)/0.3)] rounded-full">
+                    <Calendar className="h-8 w-8 text-[hsl(var(--calm-navy))]" />
+                  </div>
+                </div>
+                <p className="text-lg font-medium text-[hsl(var(--calm-navy))]">Loading your clarity assistant...</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -635,32 +650,83 @@ export default function CalendarChatApp() {
     );
   }
 
+  // Get current time for greeting
+  const getCurrentGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  // Get current date formatted nicely
+  const formattedDate = new Date().toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short', 
+    day: 'numeric'
+  });
+
+  // Sample quick actions for the empty state
+  const quickActions = [
+    { 
+      icon: <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform" />,
+      text: "Own Today",
+      query: "What's on my calendar today?"
+    },
+    { 
+      icon: <Clock className="h-5 w-5 group-hover:scale-110 transition-transform" />,
+      text: "See What's Coming",
+      query: "Do I have any meetings this week?"
+    },
+    { 
+      icon: <CheckCircle2 className="h-5 w-5 group-hover:scale-110 transition-transform" />,
+      text: "Free Up Time",
+      query: "Can you help me reschedule my least important meetings?"
+    }
+  ];
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-      <Card className="w-full max-w-2xl shadow-lg border-0">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-lg">
-          <CardTitle className="flex items-center gap-2">
-            <Calendar size={24} />
-            Calendar Chat Assistant
-          </CardTitle>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-mist-gray to-whisper-white p-4">
+      <Card className="w-full max-w-2xl shadow-xl border-0 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-[hsl(var(--calm-navy))] to-[hsl(var(--warm-graphite))] text-white rounded-t-xl">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-6 w-6" />
+              <span className="font-heading">Clarity</span>
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="text-xs opacity-80">
+                {formattedDate}
+              </div>
+              <button className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+                <Sun className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </CardHeader>
 
-        <CardContent className="h-[60vh] overflow-y-auto p-4 bg-white">
+        <CardContent className="h-[60vh] overflow-y-auto p-6 bg-white">
           {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-400 flex-col gap-4">
-              <div className="flex gap-4">
-                <Bot size={48} />
-                <Calendar size={48} />
-              </div>
-              <div className="text-center">
-                <p className="font-medium">Ask me anything or check your calendar!</p>
-                <p className="text-sm mt-2">
-                  Try: "What do I have scheduled this week?" or "What's on my calendar today?"
-                </p>
+            <div className="h-full flex items-center justify-center flex-col gap-6">
+              <div className="text-center max-w-xs">
+                <h2 className="font-heading text-2xl font-bold text-[hsl(var(--calm-navy))] mb-1">Turn Chaos Into Calm</h2>
+                <p className="text-sm text-gray-600 mb-5">This isn't just a schedule. It's your day, under control.</p>
+                
+                <div className="space-y-3">
+                  {quickActions.map((action, index) => (
+                    <button 
+                      key={index}
+                      className="button-primary py-3 px-5 w-full flex items-center justify-center gap-2 group"
+                      onClick={() => handleInputChange({ target: { value: action.query } } as any)}
+                    >
+                      {action.icon}
+                      <span>{action.text}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col space-y-4">
+            <div className="flex flex-col space-y-6">
               {messages.map((message: any) => {
                 // Check if this is a calendar response (either by content or by having webResponse)
                 const hasWebResponse = message.webResponse && typeof message.webResponse === 'string';
@@ -670,40 +736,67 @@ export default function CalendarChatApp() {
                 return (
                   <div
                     key={`${message.id}-${clientKey}`}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} w-full`}
                   >
-                    <div
-                      className={`relative p-3 rounded-lg ${message.role === "user" ? "bg-blue-100" : "bg-gray-100"}`}
-                    >
-                      <div className="flex items-start">
-                        <div className="mr-2">
-                          {message.role === "user" ? <User className="h-5 w-5" /> : 
-                            isCalendarResponse ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
-                        </div>
-                        <div>
-                          {message.role === "assistant" && isCalendarResponse
-                            ? formatCalendarResponse(hasWebResponse ? message.webResponse : message.content, isClient)
-                            : <span key={`content-${clientKey}`}>{message.content}</span>}
+                    {message.role !== "user" && (
+                      <div className="flex-shrink-0 mr-3 mt-1">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[hsl(var(--calm-navy))] to-[hsl(var(--warm-graphite))] flex items-center justify-center">
+                          {isCalendarResponse ? 
+                            <Calendar className="h-4 w-4 text-white" /> : 
+                            <Bot className="h-4 w-4 text-white" />}
                         </div>
                       </div>
+                    )}
+                    
+                    <div
+                      className={`relative max-w-[85%] p-4 ${message.role === "user" 
+                        ? "chat-bubble-user" 
+                        : isCalendarResponse 
+                          ? "chat-bubble-calendar" 
+                          : "chat-bubble-assistant"}`}
+                    >
+                      <div>
+                        {message.role === "assistant" && isCalendarResponse
+                          ? formatCalendarResponse(hasWebResponse ? message.webResponse : message.content, isClient)
+                          : <span key={`content-${clientKey}`} className="text-[15px] leading-relaxed">{message.content}</span>}
+                      </div>
+                      
+                      {/* Timestamp */}
+                      <div className={`text-[10px] mt-1 opacity-70 ${message.role === "user" ? "text-right text-white" : "text-left text-gray-500"}`}>
+                        {new Date(message.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </div>
                     </div>
+                    
+                    {message.role === "user" && (
+                      <div className="flex-shrink-0 ml-3 mt-1">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[hsl(var(--calm-navy))] to-[hsl(var(--warm-graphite))] flex items-center justify-center">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
               
               {(isLoading || isCalendarLoading) && (
-                <div className="flex justify-start">
-                  <div className="flex items-start">
-                    <div className="mr-2">
-                      {isCalendarLoading ? <Calendar className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+                <div className="flex justify-start w-full">
+                  <div className="flex-shrink-0 mr-3 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[hsl(var(--calm-navy))] to-[hsl(var(--warm-graphite))] flex items-center justify-center">
+                      {isCalendarLoading ? 
+                        <Calendar className="h-4 w-4 text-white" /> : 
+                        <Bot className="h-4 w-4 text-white" />}
                     </div>
-                    <div className="bg-gray-100 p-3 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="animate-pulse">●</div>
-                        <div className="animate-pulse delay-100">●</div>
-                        <div className="animate-pulse delay-200">●</div>
-                        <span className="ml-2">{isCalendarLoading ? "Checking your calendar..." : "Thinking..."}</span>
+                  </div>
+                  <div className="chat-bubble-assistant py-3 px-4">
+                    <div className="flex items-center">
+                      <div className="flex space-x-1 mr-3">
+                        <span className="animate-pulse-dot h-2 w-2 rounded-full bg-[hsl(var(--calm-navy))]" style={{"--delay": "0"} as React.CSSProperties}>●</span>
+                        <span className="animate-pulse-dot h-2 w-2 rounded-full bg-[hsl(var(--calm-navy))]" style={{"--delay": "1"} as React.CSSProperties}>●</span>
+                        <span className="animate-pulse-dot h-2 w-2 rounded-full bg-[hsl(var(--calm-navy))]" style={{"--delay": "2"} as React.CSSProperties}>●</span>
                       </div>
+                      <span className="text-sm font-medium">
+                        {isCalendarLoading ? "Checking your calendar..." : "Thinking..."}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -714,26 +807,34 @@ export default function CalendarChatApp() {
           )}
         </CardContent>
 
-        <CardFooter className="p-4 border-t bg-white rounded-b-lg">
-          <form onSubmit={onSubmit} className="flex w-full space-x-2">
-            <Input
-              value={input}
-              onChange={handleInputChange}
-              placeholder="Ask about your schedule or chat with AI..."
-              className="flex-grow border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading || isCalendarLoading}
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || isCalendarLoading || input.trim() === ""}
-              className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
-            >
-              <Send size={18} />
-            </Button>
-          </form>
-
-          <div className="text-xs text-gray-500 mt-2 text-center w-full">
-            Try asking: "What's my schedule today?" or "Do I have any meetings this week?"
+        <CardFooter className="p-5 border-t bg-white rounded-b-xl">
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <p className="text-xs font-medium text-[hsl(var(--calm-navy))]">Your Assistant is Listening</p>
+              <p className="text-xs text-gray-500">{getCurrentGreeting()}</p>
+            </div>
+            
+            <form onSubmit={onSubmit} className="flex w-full space-x-3">
+              <div className="relative flex-grow">
+                <Input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything about your schedule..."
+                  className="input-modern flex-grow py-6 pl-4 pr-10 text-base"
+                  disabled={isLoading || isCalendarLoading}
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[hsl(var(--calm-navy))] cursor-pointer transition-colors">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+              </div>
+              <Button
+                type="submit"
+                disabled={isLoading || isCalendarLoading || input.trim() === ""}
+                className="button-primary aspect-square p-3 transition-transform hover:scale-105"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </form>
           </div>
         </CardFooter>
       </Card>
